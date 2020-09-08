@@ -3,6 +3,7 @@
 
 import time
 from datetime import datetime
+import json
 
 
 
@@ -12,6 +13,7 @@ def convert_into_utc_time(ts):
 
     return utc_st
 
+
 def convert_into_local_time(ts):
     now_timestamp = time.time()
     local_time = datetime.fromtimestamp(now_timestamp)
@@ -20,3 +22,19 @@ def convert_into_local_time(ts):
     local_st = ts + offset
 
     return local_st
+
+
+class DateEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.strftime("%Y-%m-%d %H:%M:%S")
+
+        return json.JSONEncoder.default(self, obj)
+
+
+class DateDecoder(json.JSONDecoder):
+    def default(self, obj):
+        try:
+            return datetime.strptime(obj, "%Y-%m-%d %H:%M:%S")
+        except:
+            return json.JSONDecoder.decode(self, obj)

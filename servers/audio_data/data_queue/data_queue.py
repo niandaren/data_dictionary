@@ -88,7 +88,7 @@ class QueueManager(object):
 if __name__ == "__main__":
     output_logger = logging.getLogger()
     output_logger.setLevel(logging.INFO)
-    output_rthandler = RotatingFileHandler("***", maxBytes=10 * 1024 * 1024, backupCount=10)
+    output_rthandler = RotatingFileHandler("data_queue.log", maxBytes=10 * 1024 * 1024, backupCount=10)
     output_formatter = logging.Formatter("%(asctime)s - %(name)s - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s")
     output_rthandler.setFormatter(output_formatter)
     output_logger.addHandler(output_rthandler)
