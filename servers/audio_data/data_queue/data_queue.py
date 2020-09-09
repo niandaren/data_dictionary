@@ -8,14 +8,13 @@ import time
 from multiprocessing.managers import BaseManager
 import threading
 import signal
-import logging
-from logging.handlers import RotatingFileHandler
 
 current_path = os.path.realpath(__file__)
 module_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_path))))
 sys.path.append(module_path)
 
 from modules.config_reader.parse_config import ConfigReader
+from modules.log_print.print_log import LogPrint
 
 
 
@@ -51,7 +50,7 @@ class QueueManager(object):
         manager.start()
 
         while not self.stop_flag.is_set():
-            logging.info("task queue is running......")
+            logger.info("task queue is running......")
             time.sleep(QueueManager.__period_seconds)
 
         manager.shutdown()
@@ -73,12 +72,12 @@ class QueueManager(object):
         return manager.audio_queue_v2()
 
     def stop(self):
-        logging.warning("try to stop the process")
+        logger.warning("try to stop the process")
 
         self.stop_flag.set()
 
     def signal_term_handler(self, signal_value, frame):
-        logging.info("the process got {0}".format(signal_value))
+        logger.info("the process got {0}".format(signal_value))
 
         if signal_value == signal.SIGTERM or signal_value == signal.SIGINT:
             self.stop()
@@ -86,12 +85,11 @@ class QueueManager(object):
 
 
 if __name__ == "__main__":
-    output_logger = logging.getLogger()
-    output_logger.setLevel(logging.INFO)
-    output_rthandler = RotatingFileHandler("data_queue.log", maxBytes=10 * 1024 * 1024, backupCount=10)
-    output_formatter = logging.Formatter("%(asctime)s - %(name)s - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s")
-    output_rthandler.setFormatter(output_formatter)
-    output_logger.addHandler(output_rthandler)
+    log_path = "audio_logs/data_queue.log"
+    log_formatter = "%(asctime)s - %(name)s - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s"
+
+    log_print_obj = LogPrint()
+    logger = log_print_obj.init_logger(log_path, log_formatter)
 
     run_job = QueueManager()
 

@@ -32,9 +32,11 @@ class DateEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-class DateDecoder(json.JSONDecoder):
-    def default(self, obj):
+def date_decoder(dict):
+    for k, v in dict.items():
         try:
-            return datetime.strptime(obj, "%Y-%m-%d %H:%M:%S")
+            dict[k] = datetime.strptime(v, "%Y-%m-%d %H:%M:%S")
         except:
-            return json.JSONDecoder.decode(self, obj)
+            pass
+
+    return dict

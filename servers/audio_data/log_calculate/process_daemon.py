@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
+import os
+import sys
 import signal
 import time
 import threading
 from multiprocessing import Process, Manager
-import logging
-from logging.handlers import RotatingFileHandler
 
+current_path = os.path.realpath(__file__)
+module_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_path))))
+sys.path.append(module_path)
+
+from modules.log_print.print_log import LogPrint
 from process_start import CalculateAudioDataV1, CalculateAudioDataV2
 
 
@@ -46,13 +51,13 @@ class ProcessDaemon(object):
                 sub_process = Process(target=new_job.run)
                 sub_process.start()
                 pid = sub_process.pid
-                logging.info("process daemon start a subprocess for audio data v1, the pid is: {0}".format(pid))
+                logger.info("process daemon start a subprocess for audio data v1, the pid is: {0}".format(pid))
             elif self.sub_process_status_v1.get() == -1 and not sub_process.is_alive():
-                logging.info("subprocess: {0} over, exit code: {1}".format(pid, self.sub_process_status_v1.get()))
+                logger.info("subprocess: {0} over, exit code: {1}".format(pid, self.sub_process_status_v1.get()))
                 self.sub_process_status_v1.set(0)
                 self.sub_process_stop_flag_v1.set(0)
-            else:
-                logging.info("subprocess: {0} over, exit code: {1}".format(pid, self.sub_process_status_v1.get()))
+            elif not sub_process.is_alive():
+                logger.info("subprocess: {0} over, exit code: {1}".format(pid, self.sub_process_status_v1.get()))
 
             time.sleep(1)
 
@@ -63,25 +68,25 @@ class ProcessDaemon(object):
                 sub_process = Process(target=new_job.run)
                 sub_process.start()
                 pid = sub_process.pid
-                logging.info("process daemon start a subprocess for audio data v2, the pid is: {0}".format(pid))
+                logger.info("process daemon start a subprocess for audio data v2, the pid is: {0}".format(pid))
             elif self.sub_process_status_v2.get() == -1 and not sub_process.is_alive():
-                logging.info("subprocess: {0} over, exit code: {1}".format(pid, self.sub_process_status_v2.get()))
+                logger.info("subprocess: {0} over, exit code: {1}".format(pid, self.sub_process_status_v2.get()))
                 self.sub_process_status_v2.set(0)
                 self.sub_process_stop_flag_v2.set(0)
-            else:
-                logging.info("subprocess: {0} over, exit code: {1}".format(pid, self.sub_process_status_v2.get()))
+            elif not sub_process.is_alive():
+                logger.info("subprocess: {0} over, exit code: {1}".format(pid, self.sub_process_status_v2.get()))
 
             time.sleep(1)
 
     def stop(self):
-        logging.warning("try to stop the daemon process")
+        logger.warning("try to stop the daemon process")
 
         self.sub_process_stop_flag_v1.set(1)
         self.sub_process_stop_flag_v2.set(1)
         self.stop_flag.set()
 
     def signal_term_handler(self, signal_value, frame):
-        logging.info("main process got {0}".format(signal_value))
+        logger.info("main process got {0}".format(signal_value))
 
         if signal_value == signal.SIGTERM or signal_value == signal.SIGINT:
             self.stop()
@@ -89,16 +94,15 @@ class ProcessDaemon(object):
 
 
 if __name__ == "__main__":
-    output_logger = logging.getLogger()
-    output_logger.setLevel(logging.INFO)
-    output_rthandler = RotatingFileHandler("process_daemon.log", maxBytes=10 * 1024 * 1024, backupCount=10)
-    output_formatter = logging.Formatter("%(asctime)s - %(name)s - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s")
-    output_rthandler.setFormatter(output_formatter)
-    output_logger.addHandler(output_rthandler)
+    log_path = "audio_logs/process_daemon.log"
+    log_formatter = "%(asctime)s - %(name)s - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s"
 
-    logging.getLogger("cassandra.cluster").setLevel(logging.CRITICAL)
-    logging.getLogger("cassandra.policies").setLevel(logging.CRITICAL)
-    logging.getLogger("cassandra.pool").setLevel(logging.CRITICAL)
+    log_print_obj = LogPrint()
+    logger = log_print_obj.init_logger(log_path, log_formatter)
+
+    log_print_obj.set_log_level("cassandra.cluster", "critical")
+    log_print_obj.set_log_level("cassandra.policies", "critical")
+    log_print_obj.set_log_level("cassandra.pool", "critical")
 
     delay_v1 = 60
     delay_v2 = 60

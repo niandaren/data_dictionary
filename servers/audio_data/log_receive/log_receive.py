@@ -13,8 +13,6 @@ from multiprocessing.managers import BaseManager
 import threading
 import signal
 import functools
-import logging
-from logging.handlers import RotatingFileHandler
 
 current_path = os.path.realpath(__file__)
 module_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_path))))
@@ -23,6 +21,7 @@ sys.path.append(module_path)
 from modules.config_reader.parse_config import ConfigReader
 from modules.connector.kafka_connector import KafkaConnector
 from modules.time_handle.handle_time import DateEncoder
+from modules.log_print.print_log import LogPrint
 
 RETRY_TIMES = 5
 PERIOD_SECONDS = 60
@@ -38,9 +37,9 @@ def function_retry(retry_times, period_seconds):
                     return func(*args, **kwargs)
                 except:
                     error_data = traceback.format_exc()
-                    logging.error(error_data)
+                    logger.error(error_data)
                     time.sleep(period_seconds)
-                    logging.info(f"retry {func.__name__} {i + 1} times")
+                    logger.info(f"retry {func.__name__} {i + 1} times")
 
             return False
 
@@ -68,7 +67,7 @@ class ReceiveLog(object):
         self.audio_queue_v2 = self.get_audio_queue_v2()
 
         if self.audio_queue_v1 is False or self.get_audio_queue_v2 is False:
-            logging.error("get audio queue error")
+            logger.error("get audio queue error")
             sys.exit(1)
 
         self.stop_flag = threading.Event()
@@ -105,13 +104,13 @@ class ReceiveLog(object):
         thread_v2.join()
 
     def receive_audio_logs_v1(self):
-        logging.info("receive audio logs v1, status: start")
+        logger.info("receive audio logs v1, status: start")
 
         try:
-            kafka_consumer = self.kafka_connector.balanced_consumer("audio-log-v1", True)
+            kafka_consumer = self.kafka_connector.balanced_consumer("audio-log-v1", False)
         except:
             error_data = traceback.format_exc()
-            logging.error("topic: {0}, error_message: {1}".format("audio-log-v1", error_data))
+            logger.error("topic: {0}, error_message: {1}".format("audio-log-v1", error_data))
             return False
 
         log_count = 0
@@ -125,7 +124,8 @@ class ReceiveLog(object):
                 break
 
             message_decode = message.value.decode("utf-8")
-            origin_log = json.loads(message_decode).get("origin_log")
+            # origin_log = json.loads(message_decode).get("origin_log")
+            origin_log = message_decode
 
             now_ts = datetime.now().replace(microsecond=0, second=0)
 
@@ -134,7 +134,7 @@ class ReceiveLog(object):
                     log_info_key_list = list(log_info.keys())
                     log_info_key = log_info_key_list[0]
                     log_info = {log_info_key.strftime("%Y-%m-%d %H:%M:%S"): [log_item.strftime("%Y-%m-%d %H:%M:%S") for log_item in sorted(list(log_info[log_info_key]))]}
-                    logging.info("receive audio logs v1, log info: {0}".format(log_info))
+                    logger.info("receive audio logs v1, log info: {0}".format(log_info))
 
                 log_info = {now_ts: set()}
 
@@ -142,7 +142,7 @@ class ReceiveLog(object):
                 log_parse = self.parse_audio_logs_v1(origin_log)
             except:
                 log_parse = False
-                logging.error("parse audio logs v1 error, the origin_log: {0}".format(origin_log))
+                logger.error("parse audio logs v1 error, the origin_log: {0}".format(origin_log))
 
             if log_parse is not False:
                 self.audio_queue_v1.put(json.dumps(log_parse, cls=DateEncoder).encode("utf-8"))
@@ -152,12 +152,12 @@ class ReceiveLog(object):
             log_count += 1
 
             if log_count >= 10000:
-                logging.info("receive audio logs v1, status: running")
+                logger.info("receive audio logs v1, status: running")
                 log_count = 0
 
         kafka_consumer.stop()
 
-        logging.info("receive audio logs v1, status: over")
+        logger.info("receive audio logs v1, status: over")
 
     def parse_audio_logs_v1(self, log):
         log_time_format = '%d/%b/%Y:%X +0800'
@@ -219,13 +219,13 @@ class ReceiveLog(object):
         return False
 
     def receive_audio_logs_v2(self):
-        logging.info("receive audio logs v2, status: start")
+        logger.info("receive audio logs v2, status: start")
 
         try:
-            kafka_consumer = self.kafka_connector.balanced_consumer("audio-log-v2", True)
+            kafka_consumer = self.kafka_connector.balanced_consumer("audio-log-v2", False)
         except:
             error_data = traceback.format_exc()
-            logging.error("topic: {0}, error_message: {1}".format("audio-log-v2", error_data))
+            logger.error("topic: {0}, error_message: {1}".format("audio-log-v2", error_data))
             return False
 
         log_count = 0
@@ -239,7 +239,8 @@ class ReceiveLog(object):
                 break
 
             message_decode = message.value.decode("utf-8")
-            origin_log = json.loads(message_decode).get("origin_log")
+            # origin_log = json.loads(message_decode).get("origin_log")
+            origin_log = message_decode
 
             now_ts = datetime.now().replace(microsecond=0, second=0)
 
@@ -248,7 +249,7 @@ class ReceiveLog(object):
                     log_info_key_list = list(log_info.keys())
                     log_info_key = log_info_key_list[0]
                     log_info = {log_info_key.strftime("%Y-%m-%d %H:%M:%S"): [log_item.strftime("%Y-%m-%d %H:%M:%S") for log_item in sorted(list(log_info[log_info_key]))]}
-                    logging.info("receive audio logs v1, log info: {0}".format(log_info))
+                    logger.info("receive audio logs v1, log info: {0}".format(log_info))
 
                 log_info = {now_ts: set()}
 
@@ -256,7 +257,7 @@ class ReceiveLog(object):
                 log_parse = self.parse_audio_logs_v2(origin_log)
             except:
                 log_parse = False
-                logging.error("parse audio logs v2 error, the origin_log: {0}".format(origin_log))
+                logger.error("parse audio logs v2 error, the origin_log: {0}".format(origin_log))
 
             if log_parse is not False:
                 self.audio_queue_v2.put(json.dumps(log_parse, cls=DateEncoder).encode("utf-8"))
@@ -266,12 +267,12 @@ class ReceiveLog(object):
             log_count += 1
 
             if log_count >= 10000:
-                logging.info("receive audio logs v2, status: running")
+                logger.info("receive audio logs v2, status: running")
                 log_count = 0
 
         kafka_consumer.stop()
 
-        logging.info("receive audio logs v2, status: over")
+        logger.info("receive audio logs v2, status: over")
 
     def parse_audio_logs_v2(self, log):
         log_time_format = '%d/%b/%Y:%X +0800'
@@ -358,12 +359,12 @@ class ReceiveLog(object):
         return 2
 
     def stop(self):
-        logging.warning("try to stop the process")
+        logger.warning("try to stop the process")
 
         self.stop_flag.set()
 
     def signal_term_handler(self, signal_value, frame):
-        logging.info("the process got {0}".format(signal_value))
+        logger.info("the process got {0}".format(signal_value))
 
         if signal_value == signal.SIGTERM or signal_value == signal.SIGINT:
             self.stop()
@@ -371,12 +372,11 @@ class ReceiveLog(object):
 
 
 if __name__ == "__main__":
-    output_logger = logging.getLogger()
-    output_logger.setLevel(logging.INFO)
-    output_rthandler = RotatingFileHandler("log_receive.log", maxBytes=10 * 1024 * 1024, backupCount=10)
-    output_formatter = logging.Formatter("%(asctime)s - %(name)s - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s")
-    output_rthandler.setFormatter(output_formatter)
-    output_logger.addHandler(output_rthandler)
+    log_path = "audio_logs/log_receive.log"
+    log_formatter = "%(asctime)s - %(name)s - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s"
+
+    log_print_obj = LogPrint()
+    logger = log_print_obj.init_logger(log_path, log_formatter)
 
     run_job = ReceiveLog()
 

@@ -20,7 +20,7 @@ sys.path.append(module_path)
 from modules.config_reader.parse_config import ConfigReader
 from modules.connector.cassandra_connector import CassandraConnector
 from modules.time_handle.handle_time import convert_into_utc_time
-from modules.time_handle.handle_time import DateDecoder
+from modules.time_handle.handle_time import date_decoder
 
 from calculate_one_minute_logs_v1 import CalculateOneMinuteLogs as CalculateOneMinuteLogsV1
 from calculate_one_minute_logs_v2 import CalculateOneMinuteLogs as CalculateOneMinuteLogsV2
@@ -96,7 +96,7 @@ class CalculateAudioDataV1(object):
         return manager.audio_queue_v1()
 
     def init_cassandra(self):
-        if not self.cassandra_connector.prepare_stmt("update_device_audio_data", "ks_ajmd_dw", "update device_audio_daily set start_type=?,end_type=?,end_time=?,live_status=?,pid=?,tid=?,netstat=?,start_pos=?,end_pos=? where date=? and device_id=? and start_time=? and phid=?"):
+        if not self.cassandra_connector.prepare_stmt("update_device_audio_data", "data_dictionary", "update device_audio_daily set start_type=?,end_type=?,end_time=?,live_status=?,pid=?,tid=?,netstat=?,start_pos=?,end_pos=? where date=? and device_id=? and start_time=? and phid=?"):
             logging.error("init cassandra db error")
             sys.exit(2)
 
@@ -133,14 +133,25 @@ class CalculateAudioDataV1(object):
                 if self.period_logs_info[period_key].get("end_ts") is None:
                     continue
 
+                # """离线计算"""
+                # if period_key.hour == 23 and period_key.minute == 59:
+                #     self.stop_flag.set(1)
+                #     calculate_logs_info[period_key] = self.period_logs_info[period_key].get("log_list")
+                #     del self.period_logs_info[period_key]
+                #     break
+                # else:
+                #     calculate_logs_info[period_key] = self.period_logs_info[period_key].get("log_list")
+                #     del self.period_logs_info[period_key]
+
+                """实时计算"""
                 if now_ts > self.period_logs_info[period_key].get("end_ts"):
                     if period_key.hour == 23 and period_key.minute == 59:
                         self.stop_flag.set(1)
-                        calculate_logs_info[period_key] = self.period_logs_info[period_key].get("logs_list")
+                        calculate_logs_info[period_key] = self.period_logs_info[period_key].get("log_list")
                         del self.period_logs_info[period_key]
                         break
                     else:
-                        calculate_logs_info[period_key] = self.period_logs_info[period_key].get("logs_list")
+                        calculate_logs_info[period_key] = self.period_logs_info[period_key].get("log_list")
                         del self.period_logs_info[period_key]
 
             calculate_minute_list = sorted(calculate_logs_info.keys())
@@ -272,20 +283,30 @@ class CalculateAudioDataV1(object):
         while not self.stop_flag.get() == 1:
             try:
                 if not self.audio_queue.empty():
-                    now_ts = datetime.now().replace(microsecond=0)
+                    try:
+                        now_ts = datetime.now().replace(microsecond=0)
 
-                    message = self.audio_queue.get()
-                    log_info = json.loads(message.decode("utf-8"), cls=DateDecoder)
+                        message = self.audio_queue.get()
+                        log_info = json.loads(message.decode("utf-8"), object_hook=date_decoder)
 
-                    log_time = log_info.get("log_time")
-                    log_minute = log_time.replace(second=0)
-                    log_end_ts = log_minute + timedelta(minutes=1) + timedelta(seconds=self.delay_value)
+                        log_time = log_info.get("log_time")
+                        log_minute = log_time.replace(second=0)
+                        log_end_ts = log_minute + timedelta(minutes=1) + timedelta(seconds=self.delay_value)
 
-                    if now_ts <= log_end_ts:
-                        if log_minute not in self.period_logs_info:
-                            self.period_logs_info[log_minute] = {"log_list": [], "end_ts": log_end_ts}
+                        # """离线计算"""
+                        # if log_minute not in self.period_logs_info:
+                        #     self.period_logs_info[log_minute] = {"log_list": [], "end_ts": log_end_ts}
+                        #
+                        # self.period_logs_info[log_minute]["log_list"].append(log_info)
 
-                        self.period_logs_info[log_minute]["log_list"].append(log_info)
+                        """实时计算"""
+                        if now_ts <= log_end_ts:
+                            if log_minute not in self.period_logs_info:
+                                self.period_logs_info[log_minute] = {"log_list": [], "end_ts": log_end_ts}
+
+                            self.period_logs_info[log_minute]["log_list"].append(log_info)
+                    except:
+                        logging.error(message)
                 else:
                     logging.info("audio queue is empty...")
                     time.sleep(1)
@@ -340,7 +361,7 @@ class CalculateAudioDataV2(object):
         return manager.audio_queue_v2()
 
     def init_cassandra(self):
-        if not self.cassandra_connector.prepare_stmt("update_device_audio_data", "ks_ajmd_dw", "update device_audio_daily set start_type=?,end_type=?,end_time=?,live_status=?,pid=?,tid=?,netstat=?,start_pos=?,end_pos=?,album_id=?,controller=?,audio_id=?,key_id=?,user_id=? where date=? and device_id=? and start_time=? and phid=?"):
+        if not self.cassandra_connector.prepare_stmt("update_device_audio_data", "data_dictionary", "update device_audio_daily set start_type=?,end_type=?,end_time=?,live_status=?,pid=?,tid=?,netstat=?,start_pos=?,end_pos=?,album_id=?,controller=?,audio_id=?,key_id=?,user_id=? where date=? and device_id=? and start_time=? and phid=?"):
             logging.error("init cassandra db error")
             sys.exit(2)
 
@@ -377,14 +398,25 @@ class CalculateAudioDataV2(object):
                 if self.period_logs_info[period_key].get("end_ts") is None:
                     continue
 
+                # """离线计算"""
+                # if period_key.hour == 23 and period_key.minute == 59:
+                #     self.stop_flag.set(1)
+                #     calculate_logs_info[period_key] = self.period_logs_info[period_key].get("log_list")
+                #     del self.period_logs_info[period_key]
+                #     break
+                # else:
+                #     calculate_logs_info[period_key] = self.period_logs_info[period_key].get("log_list")
+                #     del self.period_logs_info[period_key]
+
+                """实时计算"""
                 if now_ts > self.period_logs_info[period_key].get("end_ts"):
                     if period_key.hour == 23 and period_key.minute == 59:
                         self.stop_flag.set(1)
-                        calculate_logs_info[period_key] = self.period_logs_info[period_key].get("logs_list")
+                        calculate_logs_info[period_key] = self.period_logs_info[period_key].get("log_list")
                         del self.period_logs_info[period_key]
                         break
                     else:
-                        calculate_logs_info[period_key] = self.period_logs_info[period_key].get("logs_list")
+                        calculate_logs_info[period_key] = self.period_logs_info[period_key].get("log_list")
                         del self.period_logs_info[period_key]
 
             calculate_minute_list = sorted(calculate_logs_info.keys())
@@ -519,20 +551,30 @@ class CalculateAudioDataV2(object):
         while not self.stop_flag.get() == 1:
             try:
                 if not self.audio_queue.empty():
-                    now_ts = datetime.now().replace(microsecond=0)
+                    try:
+                        now_ts = datetime.now().replace(microsecond=0)
 
-                    message = self.audio_queue.get()
-                    log_info = json.loads(message.decode("utf-8"), cls=DateDecoder)
+                        message = self.audio_queue.get()
+                        log_info = json.loads(message.decode("utf-8"), object_hook=date_decoder)
 
-                    log_time = log_info.get("log_time")
-                    log_minute = log_time.replace(second=0)
-                    log_end_ts = log_minute + timedelta(minutes=1) + timedelta(seconds=self.delay_value)
+                        log_time = log_info.get("log_time")
+                        log_minute = log_time.replace(second=0)
+                        log_end_ts = log_minute + timedelta(minutes=1) + timedelta(seconds=self.delay_value)
 
-                    if now_ts <= log_end_ts:
-                        if log_minute not in self.period_logs_info:
-                            self.period_logs_info[log_minute] = {"log_list": [], "end_ts": log_end_ts}
+                        # """离线计算"""
+                        # if log_minute not in self.period_logs_info:
+                        #     self.period_logs_info[log_minute] = {"log_list": [], "end_ts": log_end_ts}
+                        #
+                        # self.period_logs_info[log_minute]["log_list"].append(log_info)
 
-                        self.period_logs_info[log_minute]["log_list"].append(log_info)
+                        """实时计算"""
+                        if now_ts <= log_end_ts:
+                            if log_minute not in self.period_logs_info:
+                                self.period_logs_info[log_minute] = {"log_list": [], "end_ts": log_end_ts}
+
+                            self.period_logs_info[log_minute]["log_list"].append(log_info)
+                    except:
+                        logging.error(message)
                 else:
                     logging.info("audio queue is empty...")
                     time.sleep(1)

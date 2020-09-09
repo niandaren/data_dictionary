@@ -35,7 +35,7 @@ class CalculateOneMinuteLogs(object):
         self.cassandra_connector.password = cassandra_password
 
     def init_cassandra(self):
-        if not self.cassandra_connector.prepare_stmt("update_device_audio_data", "ks_ajmd_dw", "update device_audio_daily set start_type=?,end_type=?,end_time=?,live_status=?,pid=?,tid=?,netstat=?,start_pos=?,end_pos=?,album_id=?,controller=?,audio_id=?,key_id=?,user_id=? where date=? and device_id=? and start_time=? and phid=?"):
+        if not self.cassandra_connector.prepare_stmt("update_device_audio_data", "data_dictionary", "update device_audio_daily set start_type=?,end_type=?,end_time=?,live_status=?,pid=?,tid=?,netstat=?,start_pos=?,end_pos=?,album_id=?,controller=?,audio_id=?,key_id=?,user_id=? where date=? and device_id=? and start_time=? and phid=?"):
             logging.error("init cassandra db error")
             sys.exit(1)
 
