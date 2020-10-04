@@ -64,11 +64,20 @@ class KafkaConnector(object):
             use_rdkafka=use_rdkafka
         )
 
-    def get_producer(self, topic):
+    def get_async_producer(self, topic, use_rdkafka):
         hosts = self.kafka_config.get("hosts")
 
         client = KafkaClient(hosts=hosts)
 
         topic = client.topics[topic.encode()]
 
-        return topic.get_sync_producer()
+        return topic.get_producer(use_rdkafka=use_rdkafka, sync=False, delivery_reports=True)
+
+    def get_sync_producer(self, topic, use_rdkafka):
+        hosts = self.kafka_config.get("hosts")
+
+        client = KafkaClient(hosts=hosts)
+
+        topic = client.topics[topic.encode()]
+
+        return topic.get_producer(use_rdkafka=use_rdkafka, sync=True)
